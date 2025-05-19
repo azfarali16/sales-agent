@@ -8,36 +8,24 @@ import threading
 import time
 
 class AgentSession:
-    def __init__(self, initial_state: dict, agent, session_path = 'sessionLogs',  timeout=24):
-        print("Creating Session")
-        self.initial_state = initial_state
+    def __init__(self, lead_id, lead_name, agent, session_path="sessionLogs",timeout=24):
+        self.lead_id = lead_id
+        self.lead_name = lead_name
         self.agent = agent
-        self.timeout = timeout
-        self.followup_count = 0
-
-
-        self.lead_name = initial_state["LeadName"]
-        self.lead_id = initial_state["LeadID"]
-
         self.session_path = session_path
 
         self.session_service = InMemorySessionService()
-        self.app_name = f"{self.lead_name} LeadAgent"
-        self.user_id = self.lead_name
+        self.app_name = f"{lead_name} LeadAgent"
+        self.user_id = lead_name
         self.session_id = str(uuid.uuid4())
         self.end_session = False
-
-        self.timer = None
 
         self.session = self.session_service.create_session(
             app_name=self.app_name,
             user_id=self.user_id,
             session_id=self.session_id,
-            state=self.initial_state,
+            state={"LeadID": lead_id, "LeadName": lead_name},
         )
-
-        print("CREATED NEW SESSION:")
-        print(f"\tSession ID: {self.session_id}")
 
         self.runner = Runner(
             agent=self.agent,
@@ -45,40 +33,43 @@ class AgentSession:
             session_service=self.session_service,
         )
 
+        # Start with system message to trigger first model output
+        self.initial_prompt = None
+        self._process_message(self.initial_prompt)
+
+
     def _end_session(self):
-        if self.timer:
-            self.timer.cancel()
+        # if self.timer:
+        #     self.timer.cancel()
+        self.end_session = True
         self._save_session_log()
         self.session_service.close_session(session=self.session)
 
+    # def _start_followup_timer(self):
+    #     if self.timer:
+    #         self.timer.cancel()
+    #     self.timer = threading.Timer(self.timeout, self._send_followup)
+    #     self.timer.start()
 
-    def _start_followup_timer(self):
-        if self.timer:
-            self.timer.cancel()
-        self.timer = threading.Timer(self.timeout, self._send_followup)
-        self.timer.start()
-
-
-    def _send_followup(self):
-        if self.end_session:
-            return
-        self.followup_count += 1
-        if self.followup_count == 1:
-            print("\nModel: Just checking in — are you still there?")
-        elif self.followup_count == 2:
-            print("\nModel: Still here to help if you need anything.")
-        else:
-            print("\nModel: Ending session due to inactivity.")
-            self.end_session = 1
-            # self._end_session()
-        print(f"{self.lead_name}: ", end='', flush=True)
-        if not self.end_session:
-            self._start_followup_timer()
-
-
+    # def _send_followup(self):
+    #     if self.end_session:
+    #         return
+    #     self.followup_count += 1
+    #     if self.followup_count == 1:
+    #         print("\nModel: Just checking in — are you still there?")
+    #     elif self.followup_count == 2:
+    #         print("\nModel: Still here to help if you need anything.")
+    #     else:
+    #         print("\nModel: Ending session due to inactivity.")
+    #         self.end_session = 1
+    #         # self._end_session()
+    #     print(f"{self.lead_name}: ", end='', flush=True)
+    #     if not self.end_session:
+    #         self._start_followup_timer()
 
 
     def _process_message(self, new_message):
+        response_text = None
         for event in self.runner.run(
             user_id=self.user_id,
             session_id=self.session_id,
@@ -86,8 +77,7 @@ class AgentSession:
         ):
             if event.is_final_response():
                 if event.content and event.content.parts:
-                    print(f"Model: {event.content.parts[0].text}")
-                    self._start_followup_timer()
+                    response_text = event.content.parts[0].text
 
             if hasattr(event, "content") and event.content and event.content.parts:
                 for part in event.content.parts:
@@ -97,26 +87,16 @@ class AgentSession:
                             response.name == "store_lead_info"
                             and response.response.get("status") == 1
                         ):
-                            print("Lead info successfully stored. Ending session.")
-                            self.end_session = True
-                            break
+                            self._end_session()
+                            return "Thank you for taking participating."
+        return response_text
 
-    def run(self):
-        new_message = None
-        self._process_message(new_message)
-        while not self.end_session:
-            print('looping')
-            user_input = input(f"{self.lead_name}: ")
-            self.followup_count = 0
-            if not user_input.strip():
-                continue
-            new_message = types.Content(
-                role="user",
-                parts=[types.Part(text=user_input)]
-            )
-            self._process_message(new_message)
+    def handle_user_message(self, text):
+        if self.end_session:
+            return "Session has already ended."
 
-        self._end_session()
+        user_msg = types.Content(role="user", parts=[types.Part(text=text)])
+        return self._process_message(user_msg)
 
 
     def _save_session_log(self):

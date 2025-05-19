@@ -1,62 +1,222 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Lead Form</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sales Lead Form</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <style>
+    /* Minimal inline styles if CSS file is missing */
+    .chat-container {
+      display: none;
+      border: 1px solid #ccc;
+      padding: 10px;
+      max-width: 600px;
+      margin: 20px auto;
+    }
+
+    .chat-messages {
+      border: 1px solid #ddd;
+      padding: 10px;
+      height: 300px;
+      overflow-y: scroll;
+      background-color: #f9f9f9;
+      margin-bottom: 10px;
+    }
+
+    .message {
+      margin: 5px 0;
+      padding: 6px 10px;
+      border-radius: 5px;
+      max-width: 80%;
+    }
+
+    .user-message {
+      background-color: #d1e7dd;
+      align-self: flex-end;
+      text-align: right;
+    }
+
+    .agent-message {
+      background-color: #e2e3e5;
+      align-self: flex-start;
+    }
+
+    .chat-input {
+      display: flex;
+    }
+
+    .chat-input input {
+      flex-grow: 1;
+      padding: 8px;
+    }
+
+    .chat-input button {
+      padding: 8px 12px;
+    }
+
+    .success-message {
+      text-align: center;
+      display: none;
+    }
+
+    .form-container {
+      max-width: 600px;
+      margin: auto;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    input[type="text"],
+    input[type="email"] {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+  </style>
 </head>
 <body>
-    <h1>Contact Sales Team</h1>
+  <h1 style="text-align: center;">Contact Sales Team</h1>
 
-    <div class="form-container">
-        <form id="leadForm">
-            <div class="form-group">
-                <label for="fullName">Full Name</label>
-                <input type="text" id="fullName" name="fullName" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="email">Email Address</label>
-                <input type="email" id="email" name="email" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="companyName">Company Name</label>
-                <input type="text" id="companyName" name="companyName">
-            </div>
-            
-            <button type="submit">Talk to Sales</button>
-        </form>
+  <div class="form-container">
+    <form id="leadForm">
+      <div class="form-group">
+        <label for="fullName">Full Name</label>
+        <input type="text" id="fullName" name="fullName" required />
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" required />
+      </div>
+
+      <div class="form-group">
+        <label for="companyName">Company Name</label>
+        <input type="text" id="companyName" name="companyName" />
+      </div>
+
+      <button type="submit">Talk to Sales</button>
+    </form>
+  </div>
+
+  <div id="chatContainer" class="chat-container">
+    <div class="chat-header"><strong>Sales Agent</strong></div>
+    <div id="chatMessages" class="chat-messages"></div>
+    <div class="chat-input">
+      <input type="text" id="userInput" placeholder="Type your message..." />
+      <button id="sendMessage">Send</button>
     </div>
+  </div>
 
-    <div id="successMessage" class="success-message" style="display: none;">
-        Thank you! A sales representative will reach out to you shortly.
-    </div>
+  <div id="successMessage" class="success-message">
+    Thank you! A sales representative will reach out to you shortly.
+  </div>
 
-    <script>
-        document.getElementById('leadForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+  <script>
+  let leadId = null;
+  let inactivityTimer = null;
+  let followupCount = 0;
 
-            const fullName = document.getElementById('fullName').value;
-            const email = document.getElementById('email').value;
-            const companyName = document.getElementById('companyName').value;
+  document.getElementById('leadForm').addEventListener('submit', function (e) {
+    e.preventDefault();
 
-            fetch('/submit_form', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    fullName,
-                    email,
-                    companyName
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.querySelector('.form-container').style.display = 'none';
-                document.getElementById('successMessage').style.display = 'block';
-            });
-        });
-    </script>
+    const fullName = document.getElementById('fullName').value;
+    const email = document.getElementById('email').value;
+    const companyName = document.getElementById('companyName').value;
+
+    fetch('/submit_form', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fullName,
+        email,
+        companyName
+      })
+    })
+      .then(response => response.json())
+      .then(data => {
+        leadId = data.leadId;
+        document.querySelector('.form-container').style.display = 'none';
+        document.getElementById('successMessage').style.display = 'none';
+        document.getElementById('chatContainer').style.display = 'block';
+
+        const greeting = "Hey " + fullName + ", thank you for filling out the form. I'd like to gather some information from you. Is that okay?";
+        addMessage(greeting, 'agent');
+        resetInactivityTimer();
+      });
+  });
+
+  document.getElementById('sendMessage').addEventListener('click', sendUserMessage);
+  document.getElementById('userInput').addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') sendUserMessage();
+  });
+
+  function sendUserMessage() {
+    const input = document.getElementById('userInput');
+    const message = input.value.trim();
+    if (!message) return;
+
+    addMessage(message, 'user');
+    input.value = '';
+    followupCount = 0;
+    resetInactivityTimer();
+
+    fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId, message })
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (data.agentResponse) {
+         if (data.agentResponse.toLowerCase().includes("thank you for taking participating.")) {
+            if (inactivityTimer) clearTimeout(inactivityTimer);
+            document.getElementById('userInput').disabled = true;
+            document.getElementById('sendMessage').disabled = true;
+        }
+          addMessage(data.agentResponse, 'agent');
+        }
+      });
+  }
+
+  function addMessage(text, sender) {
+    const message = document.createElement('div');
+    message.classList.add('message');
+    message.classList.add(sender === 'user' ? 'user-message' : 'agent-message');
+    message.textContent = text;
+    const container = document.getElementById('chatMessages');
+    container.appendChild(message);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function resetInactivityTimer() {
+    if (inactivityTimer) {
+      clearTimeout(inactivityTimer);
+    }
+
+    inactivityTimer = setTimeout(() => {
+      followupCount++;
+      if (followupCount === 1) {
+        addMessage("Just checking in — are you still there?", 'agent');
+        resetInactivityTimer();
+      } else if (followupCount === 2) {
+        addMessage("Still here to help if you need anything.", 'agent');
+        resetInactivityTimer();
+      } else {
+        addMessage("Ending session due to inactivity.", 'agent');
+        document.getElementById('userInput').disabled = true;
+        document.getElementById('sendMessage').disabled = true;
+      }
+    }, 10000); // 30 seconds, change as needed
+  }
+</script>
+
 </body>
 </html>
