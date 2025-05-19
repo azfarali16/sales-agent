@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Lead Form</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <h1>Contact Sales Team</h1>
+
+    <div class="form-container">
+        <form id="leadForm">
+            <div class="form-group">
+                <label for="fullName">Full Name</label>
+                <input type="text" id="fullName" name="fullName" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="companyName">Company Name</label>
+                <input type="text" id="companyName" name="companyName">
+            </div>
+            
+            <button type="submit">Talk to Sales</button>
+        </form>
+    </div>
+
+    <div id="successMessage" class="success-message" style="display: none;">
+        Thank you! A sales representative will reach out to you shortly.
+    </div>
+
+    <script>
+        document.getElementById('leadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const fullName = document.getElementById('fullName').value;
+            const email = document.getElementById('email').value;
+            const companyName = document.getElementById('companyName').value;
+
+            fetch('/submit_form', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fullName,
+                    email,
+                    companyName
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.querySelector('.form-container').style.display = 'none';
+                document.getElementById('successMessage').style.display = 'block';
+            });
+        });
+    </script>
+</body>
+</html>

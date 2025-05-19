@@ -1,0 +1,13 @@
+lead_id,name,age,country,interest,status
+123098,Azfar,25.0,Pakistan,Bicycle,secured
+Brandon,Brandon,25.0,Pakistan,Books,secured
+0077,Peter,25.0,Pakistan,Horror Books,secured
+00477,Peter,,,,ignored
+00477,Peter,,Pakistan,bikes,secured
+0072,Fajju,23.0,Pakistan,Video Games,secured
+0072,Fajju,,,,ignored
+0072,Fajju,,,,ignored
+0072,Fajju,,,,ignored
+0072,Fajju,,,,secured
+0072,Fajju,84.0,pakistan,books,secured
+00972,Fajju,20,Pakistan,Cricket,secured
