@@ -30,11 +30,3 @@ It collects basic information through an HTTP form, interacts with the user via 
 - CSV for data storage
 
 ---
-
-## Directory Structure
-sales-agent/
-├── bot_logic.py
-├── form.html
-├── server.py
-├── leads.csv
-└── README.md
